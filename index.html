@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>География Мира</title>
+
+  <!-- Стили прямо в файле -->
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: url('https://images.unsplash.com/photo-1505842465776-3ecf722b89ee?ixlib=rb-4.0.3&auto=format&fit=crop&w=1740&q=80') no-repeat center center fixed;
+      background-size: cover;
+      color: #333;
+    }
+
+    header {
+      background: rgba(0, 119, 182, 0.8);
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    section {
+      background: rgba(255, 255, 255, 0.9);
+      margin: 20px;
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    #flashcard img, .landmark img {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+
+    .buttons {
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    button {
+      background-color: #0077b6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #023e8a;
+    }
+
+    #map {
+      width: 100%;
+      height: 400px;
+      margin-top: 20px;
+    }
+
+    #timer {
+      font-size: 18px;
+      color: #d00000;
+      margin-top: 10px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .landmarks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .landmark {
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 10px;
+      text-align: center;
+    }
+  </style>
+
+  <!-- Карта Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+
+<header>
+  <h1 id="welcome">Добро пожаловать на сайт География Мира!</h1>
+  <p id="description">Изучайте страны, столицы и достопримечательности через интерактивные задания!</p>
+  <button id="language-btn" onclick="switchLanguage()">Сменить язык</button>
+</header>
+
+<section id="intro">
+  <h2>О проекте</h2>
+  <p>Этот сайт поможет вам узнать больше о странах, столицах и достопримечательностях мира через увлекательные флэш-карты и задания!</p>
+</section>
+
+<section id="landmarks">
+  <h2>Достопримечательности</h2>
+  <div class="landmarks" id="landmark-list"></div>
+</section>
+
+<section id="flashcards">
+  <h2>Флэш-карты достопримечательностей</h2>
+  <div id="flashcard">
+    <img id="flashcard-image" src="" alt="Флэш-карта">
+    <h3 id="flashcard-title"></h3>
+    <div class="buttons">
+      <button onclick="prevCard()">Назад</button>
+      <button onclick="nextCard()">Вперед</button>
+    </div>
+  </div>
+</section>
+
+<section id="facts">
+  <h2>Интересный факт</h2>
+  <p id="fact-text"></p>
+  <p id="timer"></p>
+</section>
+
+<section id="map-section">
+  <h2>Найди столицу на карте</h2>
+  <div id="map"></div>
+  <p id="map-question"></p>
+</section>
+
+<!-- Leaflet карта -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Скрипт прямо в HTML -->
+<script>
+const landmarks = [
+  { title: "Эйфелева башня, Франция", image: "https://upload.wikimedia.org/wikipedia/commons/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg" },
+  { title: "Тадж-Махал, Индия", image: "https://upload.wikimedia.org/wikipedia/commons/d/da/Taj-Mahal.jpg" },
+  { title: "Статуя Свободы, США", image: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Statue_of_Liberty_7.jpg" },
+  { title: "Кремль, Россия", image: "https://upload.wikimedia.org/wikipedia/commons/7/70/Moscow_Kremlin.jpg" },
+  { title: "Великая Китайская стена, Китай", image: "https://upload.wikimedia.org/wikipedia/commons/6/6f/GreatWall_China.jpg" }
+];
+
+const facts = [
+  "Россия — самая большая страна в мире.",
+  "Нигерия — самая густонаселённая страна в Африке.",
+  "Антарктида — самое холодное место на Земле.",
+  "Тихий океан — самый большой океан.",
+  "В Австралии больше кенгуру, чем людей."
+];
+
+const capitals = [
+  { country: "Франция", capital: "Париж", lat: 48.8566, lng: 2.3522 },
+  { country: "Казахстан", capital: "Астана", lat: 51.1694, lng: 71.4491 },
+  { country: "США", capital: "Вашингтон", lat: 38.8951, lng: -77.0364 },
+  { country: "Италия", capital: "Рим", lat: 41.9028, lng: 12.4964 },
+  { country: "Япония", capital: "Токио", lat: 35.6895, lng: 139.6917 }
+];
+
+let currentCard = 0;
+let currentFact = 0;
+let timerSeconds = 30;
+let language = "ru";
+let map;
+let correctCapital = {};
+
+function loadLandmarks() {
+  const container = document.getElementById('landmark-list');
+  landmarks.forEach(landmark => {
+    const div = document.createElement('div');
+    div.className = 'landmark';
+    div.innerHTML = `<img src="${landmark.image}" alt="${landmark.title}"><h3>${landmark.title}</h3>`;
+    container.appendChild(div);
+  });
+}
+
+function displayFlashcard() {
+  document.getElementById('flashcard-image').src = landmarks[currentCard].image;
+  document.getElementById('flashcard-title').innerText = landmarks[currentCard].title;
+}
+
+function nextCard() {
+  currentCard = (currentCard + 1) % landmarks.length;
+  displayFlashcard();
+}
+
+function prevCard() {
+  currentCard = (currentCard - 1 + landmarks.length) % landmarks.length;
+  displayFlashcard();
+}
+
+function changeFact() {
+  document.getElementById('fact-text').innerText = facts[currentFact];
+  currentFact = (currentFact + 1) % facts.length;
+  timerSeconds = 30;
+}
+
+function updateTimer() {
+  timerSeconds--;
+  document.getElementById('timer').innerText = `Новый факт через: ${timerSeconds} секунд`;
+  if (timerSeconds <= 0) {
+    changeFact();
+  }
+}
+
+function initMap() {
+  map = L.map('map').setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+  askCapitalQuestion();
+}
+
+function askCapitalQuestion() {
+  const randomIndex = Math.floor(Math.random() * capitals.length);
+  correctCapital = capitals[randomIndex];
+  document.getElementById('map-question').innerText = `Найдите столицу: ${correctCapital.country}`;
+
+  map.once('click', function(e) {
+    const distance = getDistance(e.latlng.lat, e.latlng.lng, correctCapital.lat, correctCapital.lng);
+    if (distance < 500) {
+      alert('Верно! Вы кликнули рядом.');
+    } else {
+      alert(`Неверно! Расстояние: ${Math.round(distance)} км`);
+    }
+    askCapitalQuestion();
+  });
+}
+
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = deg2rad(lat2-lat1);
+  const dLon = deg2rad(lon2-lon1);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
+}
+
+function switchLanguage() {
+  if (language === "ru") {
+    language = "kz";
+    document.getElementById('welcome').innerText = "География Әлемі сайтына қош келдіңіз!";
+    document.getElementById('description').innerText = "Әлемнің елдері мен астаналарын зерттеңіз!";
+    document.getElementById('language-btn').innerText = "Тілді өзгерту";
+  } else {
+    language = "ru";
+    document.getElementById('welcome').innerText = "Добро пожаловать на сайт География Мира!";
+    document.getElementById('description').innerText = "Изучайте страны, столицы и достопримечательности через интерактивные задания!";
+    document.getElementById('language-btn').innerText = "Сменить язык";
+  }
+}
+
+// --- Инициализация ---
+loadLandmarks();
+displayFlashcard();
+changeFact();
+setInterval(updateTimer, 1000);
+initMap();
+</script>
+
+</body>
+</html>
